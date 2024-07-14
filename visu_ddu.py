@@ -73,7 +73,7 @@ def existence_fichier(fichier, quitter):
     return True
   else:
     print("Le fichier " + fichier + " n'a pas été trouvé")
-    sg.popup_ok("Le fichier " + fichier + " n'a pas été trouvé", title="Erreur")
+    sg.popup_ok("Le fichier " + fichier + " n'a pas été trouvé", title="Erreur", keep_on_top=True)
     if quitter:
       exit(1)
     else:
@@ -112,12 +112,12 @@ def recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichie
   if data_minute['ddmmyyyyhhmm'][index_debut] != date_debut_fichier:
     # Pas de date pertinente dans ce fichier (index_debut)
     print("Pas de date pertinente dans ce fichier (index_debut)")
-    sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur")
+    sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur", keep_on_top=True)
     return None, False
   if data_minute['ddmmyyyyhhmm'][index_fin] != date_fin_fichier:
     # Pas de date pertinente dans ce fichier (index_fin)
     print("Pas de date pertinente dans ce fichier (index_fin)")
-    sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur")
+    sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur", keep_on_top=True)
     return None, False
 
   # Restrictions des données entre index_debut et index_fin
@@ -157,7 +157,7 @@ def recuperation_donnees():
   date_locale_debut = datetime.datetime(int(annee_debut),int(mois_debut),int(jour_debut),int(heure_debut),int(minute_debut))
   date_locale_fin = datetime.datetime(int(annee_fin),int(mois_fin),int(jour_fin),int(heure_fin),int(minute_fin))
   if date_locale_debut >= date_locale_fin:
-    sg.popup_ok("La date de début est postérieure ou égale à la date de fin !", title="Erreur")
+    sg.popup_ok("La date de début est postérieure ou égale à la date de fin !", title="Erreur", keep_on_top=True)
     return None, False
 
   # Dates au format UTC
@@ -209,7 +209,6 @@ def recuperation_donnees():
                                       orientation='h',
                                       no_titlebar=True,
                                       grab_anywhere=True,
-                                      keep_on_top=True,
                                       no_button=True):
       print('Hit the break')
       break
@@ -218,14 +217,14 @@ def recuperation_donnees():
       # Premier fichier
       data, success = recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichier)
       if not success:
-        one_line_progress_meter_cancel(key='-barre-')
+        sg.one_line_progress_meter_cancel(key='-barre-')
         return None, False
       print("Nombre de ligne pour ce fichier : " + str(data.shape[0]))
     else:
       # Fichiers suivants
       dataTmp, success = recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichier)
       if not success:
-        one_line_progress_meter_cancel(key='-barre-')
+        sg.one_line_progress_meter_cancel(key='-barre-')
         return None, False
       print("Nombre de ligne pour ce fichier : " + str(dataTmp.shape[0]))
 
@@ -276,7 +275,7 @@ def write_data(data, P=False, T=False, Tres=False, FMOY=False, DMOY=False, FINS=
   newdata.to_csv(chemin_csv, sep=";")
 
   # Message de confirmation
-  sg.popup_ok("Fichier " + chemin_csv + " exporté", title="Confirmation")
+  sg.popup_ok("Fichier " + chemin_csv + " exporté", title="Confirmation", keep_on_top=True)
 
 def plot_vent(data,unite):
   # Trace le vent moyen
@@ -558,7 +557,7 @@ def modification_date(window):
     if dates_choisies == donnees_en_memoire:
       window['-donnees_en_memoire-'].update(donnees_en_memoire, "darkgreen", "white" )
     else:
-      window['-donnees_en_memoire-'].update(donnees_en_memoire + " - récupération requise !", "firebrick", "white" )
+      window['-donnees_en_memoire-'].update(donnees_en_memoire + " - récupération requise !", "darkred", "white" )
 
 #############  PROGRAMME PRINCIPAL #############
 
@@ -611,6 +610,7 @@ if (__name__ == "__main__"):
   unite_vent = sg.user_settings_get_entry('-unite_vent-', 'kt')
   unite_pression = sg.user_settings_get_entry('-unite_pression-', 'hPa')
   unite_temperature = sg.user_settings_get_entry('-unite_temperature-', '°C')
+  chemin_figure = None
 
   ## Export CSV
   plot_p = sg.user_settings_get_entry('-plot_p-', True)
@@ -719,7 +719,7 @@ if (__name__ == "__main__"):
   ## Layout total
   layout = [ [ sg.Column(layout_gauche, element_justification='c', vertical_alignment='top'), sg.Column(layout_droite, element_justification='c', vertical_alignment='top') ] ]
 
-  ## Fenêtre
+  ## Création de la fenêtre
   window = sg.Window('MINUTE - DDU', layout, resizable=True)    
 
   # Gestion des événements
@@ -868,7 +868,7 @@ if (__name__ == "__main__"):
     if event == '-plot_vent-':
       print("plot_vent")
       if donnees_en_memoire == vide:
-        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur")
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
@@ -887,7 +887,7 @@ if (__name__ == "__main__"):
     if event == '-plot_pression-':
       print("plot_pression")
       if donnees_en_memoire == vide:
-        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur")
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
@@ -910,7 +910,7 @@ if (__name__ == "__main__"):
     if event == '-plot_temperature-':
       print("plot_temperature")
       if donnees_en_memoire == vide:
-        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur")
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
@@ -921,7 +921,7 @@ if (__name__ == "__main__"):
     if event == '-plot_humidite-':
       print("plot_humidite")
       if donnees_en_memoire == vide:
-        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur")
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
@@ -930,9 +930,12 @@ if (__name__ == "__main__"):
 
     ## Export figure
     if event == '-export_figure-':
-      plt.savefig(chemin_figure, bbox_inches="tight")
-      plt.close(fig)
-      sg.popup_ok("Fichier " + chemin_figure + " exporté", title="Confirmation")
+      if chemin_figure == None:
+        sg.popup_ok("Impossible d'exporter une figure qui n'existe pas !", title="Erreur", keep_on_top=True)
+      else:
+        plt.savefig(chemin_figure, bbox_inches="tight")
+        plt.close(fig)
+        sg.popup_ok("Fichier " + chemin_figure + " exporté", title="Confirmation", keep_on_top=True)
 
     ## Paramètres csv
     if event == '-plot_p-':
@@ -966,7 +969,11 @@ if (__name__ == "__main__"):
 
     ## Export csv
     if event == '-export_csv-':
-      print("export_csv")
-      write_data(data=data, P=plot_p, T=plot_t, FMOY=plot_ff, DMOY=plot_dd, FINS=plot_fi, HU=plot_u, VIS=plot_vis)
+      if donnees_en_memoire == vide:
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
+      else:
+        print("export_csv")
+        write_data(data=data, P=plot_p, T=plot_t, FMOY=plot_ff, DMOY=plot_dd, FINS=plot_fi, HU=plot_u, VIS=plot_vis)
 
+  # Fermeture de la fenêtre
   window.close()
