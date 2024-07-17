@@ -3,47 +3,16 @@
 Created on January 2024
 @author : R. Honnert TA-74
 
-Ce programme permet d'extraire des données d'un fichier horaire et de le mettre en forme pour le fournir aux personnes de la base qui les demandent.
-
-Utilisation du programme : en ligne de commande dans un terminal
-    exemple :  >python extract_data.py
-
-Le programme :
-    - pour les dates + heures DDU founies 
-    - passe des dates DDU en dates UTC
-    - détermine si le fichier "minute" existe
-    - extrait les dates, puis des champs demandés
-    - Fabrique un fichier de données ".ods" et dans un unique fichier trace les champs demandés. 
-
-En entrée :
-    un fichier de données minutes au format de sortie BDClim contenant les paramètres ddmmyyyyhhmm, T, DI, U, PSTA, FM1, FF, DD
-    exemple : premières lignes dun fichier source conforme :
-        ddmmyyyyhhmm;PSTA;T;U;TDET;DI;RG;DD;FF;FM1;DM1;DD;FF;FM1;DM1;
-        260820210900;994,1;-14,4;35;-26,5;0;0;190;8,5;16,5;210;;;;;
-        260820210901;994,3;-14,5;35;-26,6;0;0;190;9;14,9;200;;;;;
-
-En sortie : 
-    - Un fichier de données ".ods" et dans un unique fichier trace les champs demandés. 
-
-extract_data : fabrique un fichier temporaire qui ne comprend que les dates et heures souhaitées 
-plot_vent : tracé du vent, de la rafale et de la direction 
-plot_pression :
-plot_temperature : tracé de la température réelle et ressentie 
-plot_humidite :
-
-
-Paramètres unité/heure des graphes :
-    fuseau horaires possibles (heure) : 'UTC' ou 'DDU'
-    unités possibles pour le vent (unite) : 'm/s', 'km/h' ou 'kt'
-    unités possibles pour la pression (unite): 'hPa' ou 'mmHg'
-    unités possibles pour la température (unite) : '°C', '°F' ou 'K'
-    unité possible pour l'humidité (non implémentable par l'utilisateur) : '%' non implémentable par l'utilisateur
+A compléter...
 """
 
-### chargement des librairies :
+# Chargement des librairies
+import calendar
+import datetime
+import importlib
 import numpy as np
 import pandas as pd
-pd.set_option('mode.chained_assignment',None)
+import locale
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -53,15 +22,20 @@ import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import datetime
-import locale
-import calendar
 import os
-import sys
 from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
-import FreeSimpleGUI as sg
+import sys
 from tkinter import *
+
+# Chargement de FreeSimpleGui, ou de PySimpleGui à défaut
+try:
+  import FreeSimpleGUI as sg
+except ModuleNotFoundError:
+  import PySimpleGUI as sg
+
+# Complément pour les librairies
+pd.set_option('mode.chained_assignment',None)
+register_matplotlib_converters()
 
 ############# DEFINITION DES FONCTIONS #############
 
@@ -277,7 +251,7 @@ def write_data(data, P=False, T=False, Tres=False, FMOY=False, DMOY=False, FINS=
   # Message de confirmation
   sg.popup_ok("Fichier " + chemin_csv + " exporté", title="Confirmation", keep_on_top=True)
 
-def plot_vent(data,unite):
+def figure_vent(data,unite):
   # Trace le vent moyen
   print("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
@@ -353,7 +327,7 @@ def plot_vent(data,unite):
  
   return fig, ax, chemin_figure
 
-def plot_pression(data, unite):
+def figure_pression(data, unite):
   # Trace la pression atmosphérique
   print("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
@@ -413,7 +387,7 @@ def plot_pression(data, unite):
 
   return fig, ax, chemin_figure
 
-def plot_temperature(data,unite):
+def figure_temperature(data,unite):
   # Trace la température sous abri et la température ressentie 
   print("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
@@ -485,7 +459,7 @@ def plot_temperature(data,unite):
 
   return fig, ax, chemin_figure
 
-def plot_humidite(data):
+def figure_humidite(data):
   # Trace l'humidité relative
   print("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
@@ -577,11 +551,6 @@ if (__name__ == "__main__"):
   ## Définition du fichier des paramètres
   sg.user_settings_filename(path='.')
 
-  ## Emplacements
-  emplacement_minute = sg.user_settings_get_entry('-emplacement_minute-', os.path.join(os.path.dirname(__file__), 'minute'))
-  emplacement_figure = sg.user_settings_get_entry('-emplacement_figure-', os.path.join(os.path.dirname(__file__), 'figures'))
-  emplacement_csv = sg.user_settings_get_entry('-emplacement_csv-', os.path.join(os.path.dirname(__file__), 'csv'))
-
   ## Dates / heures / décalage
   aujourdhui = datetime.datetime.today()
   date_debut = aujourdhui.strftime("%d-%m-%Y")
@@ -600,6 +569,11 @@ if (__name__ == "__main__"):
   minute_fin = sg.user_settings_get_entry('-minute_fin-', temps_fin[3:5])
   fuseau = sg.user_settings_get_entry('-fuseau-', 'DDU')
 
+  ## Emplacements
+  emplacement_minute = sg.user_settings_get_entry('-emplacement_minute-', os.path.join("N:/partageMto_DON_SA/Minute/", annee_debut))
+  emplacement_figure = sg.user_settings_get_entry('-emplacement_figure-', os.path.join(os.path.dirname(__file__), 'figures'))
+  emplacement_csv = sg.user_settings_get_entry('-emplacement_csv-', os.path.join(os.path.dirname(__file__), 'csv'))
+
   ## Dates choisies
   dates_choisies = jour_debut + "/" + mois_debut + "/" + annee_debut + " - " + heure_debut + ":" + minute_debut + "  >>>  " + jour_fin + "/" + mois_fin + "/" + annee_fin + " - " + heure_fin + ":" + minute_fin
 
@@ -613,13 +587,13 @@ if (__name__ == "__main__"):
   chemin_figure = None
 
   ## Export CSV
-  plot_p = sg.user_settings_get_entry('-plot_p-', True)
-  plot_t = sg.user_settings_get_entry('-plot_t-', True)
-  plot_u = sg.user_settings_get_entry('-plot_u-', True)
-  plot_ff = sg.user_settings_get_entry('-plot_ff-', True)
-  plot_fi = sg.user_settings_get_entry('-plot_fi-', True)
-  plot_dd = sg.user_settings_get_entry('-plot_dd-', True)
-  plot_vis = sg.user_settings_get_entry('-plot_vis-', False)
+  csv_p = sg.user_settings_get_entry('-csv_p-', True)
+  csv_t = sg.user_settings_get_entry('-csv_t-', True)
+  csv_u = sg.user_settings_get_entry('-csv_u-', True)
+  csv_ff = sg.user_settings_get_entry('-csv_ff-', True)
+  csv_fi = sg.user_settings_get_entry('-csv_fi-', True)
+  csv_dd = sg.user_settings_get_entry('-csv_dd-', True)
+  csv_vis = sg.user_settings_get_entry('-csv_vis-', False)
 
   # Interface graphique
 
@@ -680,41 +654,44 @@ if (__name__ == "__main__"):
   frame_donnees = [ [sg.Column(sg_donnees, element_justification='c') ] ]
 
   ## Frame 4 : figure et export CSV
-  sg_figure = [ [ sg.Button('Vent', size=(12,1), enable_events=True ,key='-plot_vent-'),
+  sg_figure = [ [ sg.Button('Vent', size=(12,1), enable_events=True ,key='-figure_vent-'),
                   sg.Radio('m/s', size=(7,1), group_id=2, default=(unite_vent=='m/s'), enable_events=True, key='-unite_vent_ms-'),
                   sg.Radio('km/h', size=(7,1), group_id=2, default=(unite_vent=='km/h'), enable_events=True, key='-unite_vent_kmh-'),
                   sg.Radio('kt', size=(7,1), group_id=2, default=(unite_vent=='kt'), enable_events=True, key='-unite_vent_kt-'),  ],
-                [ sg.Button('Pression', size=(12,1), enable_events=True ,key='-plot_pression-'),
+                [ sg.Button('Pression', size=(12,1), enable_events=True ,key='-figure_pression-'),
                   sg.Radio('mmHg', size=(7,1), group_id=3, default=(unite_pression=='mmHg'), enable_events=True, key='-unite_pression_mmhg-'),
                   sg.Radio('hPa', size=(7,1), group_id=3, default=(unite_pression=='hPa'), enable_events=True, key='-unite_pression_hpa-')  ],
-                [ sg.Button('Temperature', size=(12,1), enable_events=True ,key='-plot_temperature-'),
+                [ sg.Button('Temperature', size=(12,1), enable_events=True ,key='-figure_temperature-'),
                   sg.Radio('°C', size=(7,1), group_id=4, default=(unite_temperature=='°C'), enable_events=True, key='-unite_temperature_c-'),
                   sg.Radio('°F', size=(7,1), group_id=4, default=(unite_temperature=='°F'), enable_events=True, key='-unite_temperature_f-'),
                   sg.Radio('K', size=(7,1), group_id=4, default=(unite_temperature=='K'), enable_events=True, key='-unite_temperature_k-'),  ],
-                [ sg.Button('Humidité', size=(12,1), enable_events=True ,key='-plot_humidite-') ],
-                [ sg.Button('Exporter le plot en PNG', enable_events=True ,key='-export_figure-', expand_x=True) ] ]
+                [ sg.Button('Humidité', size=(12,1), enable_events=True ,key='-figure_humidite-') ],
+                [ sg.Button('Rayonnement', size=(12,1), enable_events=True ,key='-figure_rayonnement-') ],
+                [ sg.Button('Beaufort', size=(12,1), enable_events=True ,key='-figure_beaufort-') ],
+                [ sg.Button('Exporter la figure en PNG', enable_events=True ,key='-export_figure-', expand_x=True) ] ]
 
-  sg_export_csv = [ [ sg.Checkbox('P', default=plot_p, enable_events=True, key='-plot_p-'),
-                      sg.Checkbox('T', default=plot_t, enable_events=True, key='-plot_t-'),
-                      sg.Checkbox('U', default=plot_u, enable_events=True, key='-plot_u-'),
-                      sg.Checkbox('FF', default=plot_ff, enable_events=True, key='-plot_ff-'),
-                      sg.Checkbox('FI', default=plot_fi, enable_events=True, key='-plot_fi-'),
-                      sg.Checkbox('DD', default=plot_dd, enable_events=True, key='-plot_dd-'),
-                      sg.Checkbox('VIS', default=plot_vis, enable_events=True, key='-plot_vis-') ],
+  sg_export_csv = [ [ sg.Checkbox('P', default=csv_p, enable_events=True, key='-csv_p-'),
+                      sg.Checkbox('T', default=csv_t, enable_events=True, key='-csv_t-'),
+                      sg.Checkbox('U', default=csv_u, enable_events=True, key='-csv_u-'),
+                      sg.Checkbox('FF', default=csv_ff, enable_events=True, key='-csv_ff-'),
+                      sg.Checkbox('FI', default=csv_fi, enable_events=True, key='-csv_fi-'),
+                      sg.Checkbox('DD', default=csv_dd, enable_events=True, key='-csv_dd-'),
+                      sg.Checkbox('VIS', default=csv_vis, enable_events=True, key='-csv_vis-') ],
                     [ sg.Button('Exporter au format CSV', enable_events=True ,key='-export_csv-', expand_x=True) ] ]
 
-  frame_figure = [ [ sg.Column(sg_figure, element_justification='l', expand_x=True) ],
-                   [ sg.Column(sg_export_csv, element_justification='l', expand_x=True) ] ]
+  frame_figure = [ [ sg.Column(sg_figure, element_justification='l', expand_x=True) ] ]
+  frame_csv = [ [ sg.Column(sg_export_csv, element_justification='l', expand_x=True) ] ]
 
-  ## Layout gauche
+  # Layout gauche
   layout_gauche = [ [ sg.Frame('Emplacements', frame_layout_emplacement, expand_x=True) ],
                     [ sg.Frame('Dates / heures / décalage horaire ', frame_layout_date_temps_decalage, expand_x=True) ],
                     [ sg.Frame('Récupération des données', frame_donnees, expand_x=True) ],
-                    [ sg.Frame('Plot / export CSV', frame_figure, expand_x=True), sg.Image("logo_MF.png") ],
-                    [ sg.Image("ddu.png") ] ]
+                    [ sg.Frame('Plot / export PNG', frame_figure, expand_x=True), sg.Image("logo_MF.png") ],
+                    [ sg.Frame('Export CSV', frame_csv, expand_x=True) ],
+                    [ sg.Image("ddu.png", size=(800, 320)) ] ]
 
-  ## Layout droite
-  layout_droite = [ [sg.Frame('Figure', [[sg.Canvas(key='-CANVAS-', background_color='white', size = (16*get_dpi(), 9.37*get_dpi()))]]) ] ]
+  # Layout droite
+  layout_droite = [ [sg.Frame('Figure', [[sg.Canvas(key='-CANVAS-', background_color='white', size = (16*get_dpi(), 10.25*get_dpi()))]]) ] ]
 
   ## Layout total
   layout = [ [ sg.Column(layout_gauche, element_justification='c', vertical_alignment='top'), sg.Column(layout_droite, element_justification='c', vertical_alignment='top') ] ]
@@ -865,14 +842,14 @@ if (__name__ == "__main__"):
       unite_vent = 'kt'
       print("unite_vent:" + unite_vent)
       sg.user_settings_set_entry('-unite_vent-', unite_vent)
-    if event == '-plot_vent-':
-      print("plot_vent")
+    if event == '-figure_vent-':
+      print("figure_vent")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
-        fig, ax, chemin_figure = plot_vent(data, unite_vent)
+        fig, ax, chemin_figure = figure_vent(data, unite_vent)
         tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
 
     ## Figure pression
@@ -884,14 +861,14 @@ if (__name__ == "__main__"):
       unite_pression = 'hPa'
       print("unite_pression:" + unite_pression)
       sg.user_settings_set_entry('-unite_pression-', unite_pression)
-    if event == '-plot_pression-':
-      print("plot_pression")
+    if event == '-figure_pression-':
+      print("figure_pression")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
-        fig, ax, chemin_figure = plot_pression(data,unite_pression)   # unité possibles : 'hPa' ou 'mmHg'
+        fig, ax, chemin_figure = figure_pression(data,unite_pression)   # unité possibles : 'hPa' ou 'mmHg'
         tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
 
     ## Figure température
@@ -907,26 +884,50 @@ if (__name__ == "__main__"):
       unite_temperature = 'K'
       print("unite_temperature:" + unite_temperature)
       sg.user_settings_set_entry('-unite_temperature-', unite_temperature)
-    if event == '-plot_temperature-':
-      print("plot_temperature")
+    if event == '-figure_temperature-':
+      print("figure_temperature")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
-        fig, ax, chemin_figure = plot_temperature(data,unite_temperature)   # unité possibles : 'hPa' ou 'mmHg'
+        fig, ax, chemin_figure = figure_temperature(data,unite_temperature)   # unité possibles : 'hPa' ou 'mmHg'
         tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
 
     ## Figure humidité
-    if event == '-plot_humidite-':
-      print("plot_humidite")
+    if event == '-figure_humidite-':
+      print("figure_humidite")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
-        fig, ax, chemin_figure = plot_humidite(data)
+        fig, ax, chemin_figure = figure_humidite(data)
         tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
+
+    ## Figure rayonnement
+    if event == '-figure_rayonnement-':
+      print("figure_rayonnement")
+      if donnees_en_memoire == vide:
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
+      else:
+        sg.popup_ok("Pas de encore de figure pour le rayonnement ", title="Erreur", keep_on_top=True)
+#        if 'tkcanvas' in globals():
+#          tkcanvas.get_tk_widget().destroy()
+#        fig, ax, chemin_figure = figure_rayonnement(data)
+#        tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
+
+    ## Figure beaufort
+    if event == '-figure_beaufort-':
+      print("figure_beaufort")
+      if donnees_en_memoire == vide:
+        sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
+      else:
+        sg.popup_ok("Pas de encore de figure pour l'indice beaufort ", title="Erreur", keep_on_top=True)
+#        if 'tkcanvas' in globals():
+#          tkcanvas.get_tk_widget().destroy()
+#        fig, ax, chemin_figure = figure_beaufort(data)
+#        tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
 
     ## Export figure
     if event == '-export_figure-':
@@ -938,33 +939,33 @@ if (__name__ == "__main__"):
         sg.popup_ok("Fichier " + chemin_figure + " exporté", title="Confirmation", keep_on_top=True)
 
     ## Paramètres csv
-    if event == '-plot_p-':
+    if event == '-csv_p-':
       print("Value: " + str(values[event]))
-      plot_p = values[event]
+      csv_p = values[event]
       sg.user_settings_set_entry(event, values[event])
-    if event == '-plot_t-':
+    if event == '-csv_t-':
       print("Value: " + str(values[event]))
-      plot_t = values[event]
+      csv_t = values[event]
       sg.user_settings_set_entry(event, values[event])
-    if event == '-plot_ff-':
+    if event == '-csv_ff-':
       print("Value: " + str(values[event]))
-      plot_ff = values[event]
+      csv_ff = values[event]
       sg.user_settings_set_entry(event, values[event])
-    if event == '-plot_dd-':
+    if event == '-csv_dd-':
       print("Value: " + str(values[event]))
-      plot_dd = values[event]
+      csv_dd = values[event]
       sg.user_settings_set_entry(event, values[event])
-    if event == '-plot_fi-':
+    if event == '-csv_fi-':
       print("Value: " + str(values[event]))
-      plot_fi = values[event]
+      csv_fi = values[event]
       sg.user_settings_set_entry(event, values[event])
-    if event == '-plot_u-':
+    if event == '-csv_u-':
       print("Value: " + str(values[event]))
-      plot_u = values[event]
+      csv_u = values[event]
       sg.user_settings_set_entry(event, values[event])
-    if event == '-plot_vis-':
+    if event == '-csv_vis-':
       print("Value: " + str(values[event]))
-      plot_vis = values[event]
+      csv_vis = values[event]
       sg.user_settings_set_entry(event, values[event])
 
     ## Export csv
@@ -973,7 +974,7 @@ if (__name__ == "__main__"):
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
         print("export_csv")
-        write_data(data=data, P=plot_p, T=plot_t, FMOY=plot_ff, DMOY=plot_dd, FINS=plot_fi, HU=plot_u, VIS=plot_vis)
+        write_data(data=data, P=csv_p, T=csv_t, FMOY=csv_ff, DMOY=csv_dd, FINS=csv_fi, HU=csv_u, VIS=csv_vis)
 
   # Fermeture de la fenêtre
   window.close()
