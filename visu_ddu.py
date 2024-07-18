@@ -1,9 +1,28 @@
 # -*- coding: utf-8 -*-
 """
 Created on January 2024
-@author : R. Honnert TA-74
+@author : Rachel Honnert TA74 et Benjamin Ménétrier
 
-A compléter...
+Ce script crée une interface graphique permettant de visualiser les données des fichiers "minute" du Cobalt ,
+d'exporter au format png les plots et d'exporter les données au format "png".
+
+Utilisation :
+    python visu_ddu.py
+
+Il fonctionne en python3.12 et a besoin des librairies :
+    - calendar
+    - datetime
+    - importlib
+    - numpy
+    - pandas
+    - locale
+    - matplotlib
+    - sys
+    - tkinter
+    -.FreeSimpleGUI ou à défaut PySimpleGUI
+    - logging
+
+A partir des scripts de Laura Chataignier TA71
 """
 
 # Chargement des librairies
@@ -32,32 +51,36 @@ try:
   import FreeSimpleGUI as sg
 except ModuleNotFoundError:
   import PySimpleGUI as sg
+import logging
 
 # Complément pour les librairies
 pd.set_option('mode.chained_assignment',None)
 register_matplotlib_converters()
+#
+#logging.basicConfig( filename="py_log.log",filemode="w")
+logging.basicConfig(level=logging.DEBUG, filename="py_log.log",filemode="w")
 
 ############# DEFINITION DES FONCTIONS #############
 
 ### Environnement de travail :
-def existence_fichier(fichier, quitter):   
+def existence_fichier(fichier, quitter):
   # Si le fichier n'existe pas, une fenêtre popup apparait
   # Si quitter == True, le programme s'arrête
   if os.path.isfile(fichier):
     return True
   else:
-    print("Le fichier " + fichier + " n'a pas été trouvé")
+    logging.error("Le fichier " + fichier + " n'a pas été trouvé")
     sg.popup_ok("Le fichier " + fichier + " n'a pas été trouvé", title="Erreur", keep_on_top=True)
     if quitter:
       exit(1)
     else:
       return False
 
-def existence_repertoire(repertoire) :    
+def existence_repertoire(repertoire) :
   # Si le répertoire n'existe pas, il est créé
   test = os.path.isdir(repertoire)
   if not test :
-    print("Le réperoire " + repertoire + " n'existe pas, création du répertoire")
+    logging.error("Le réperoire " + repertoire + " n'existe pas, création du répertoire")
     os.mkdir(repertoire)
 
 def recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichier):
@@ -80,17 +103,17 @@ def recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichie
       TMP.append(str(data_minute['ddmmyyyyhhmm'][x]))
   data_minute['ddmmyyyyhhmm'] = TMP
 
-  # Index de début, index de fin 
+  # Index de début, index de fin
   index_debut = (data_minute.ddmmyyyyhhmm == date_debut_fichier).idxmax()
   index_fin = (data_minute.ddmmyyyyhhmm == date_fin_fichier).idxmax()
   if data_minute['ddmmyyyyhhmm'][index_debut] != date_debut_fichier:
     # Pas de date pertinente dans ce fichier (index_debut)
-    print("Pas de date pertinente dans ce fichier (index_debut)")
+    logging.critical("Pas de date pertinente dans ce fichier (index_debut)")
     sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur", keep_on_top=True)
     return None, False
   if data_minute['ddmmyyyyhhmm'][index_fin] != date_fin_fichier:
     # Pas de date pertinente dans ce fichier (index_fin)
-    print("Pas de date pertinente dans ce fichier (index_fin)")
+    logging.critical("Pas de date pertinente dans ce fichier (index_fin)")
     sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur", keep_on_top=True)
     return None, False
 
@@ -104,24 +127,25 @@ def recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichie
   # Formatage des données numériques
   for param in data_minute.columns[2:14]:
     data_minute[param] = pd.to_numeric(data_minute[param])
-    
+
   # Création d'un index, tri des données
   data_minute.set_index(['date'], inplace=True)
   data_minute.sort_index(ascending=True, inplace=True)
- 
+
   # Enregistrement de la dataframe
   index = np.where(data_minute['ddmmyyyyhhmm'].notnull())[0]
   data_minute_final = pd.DataFrame({
     'DATE':data_minute['ddmmyyyyhhmm'].iloc[index], # date
     'T':data_minute['T'].iloc[index],               # température
     'DI':data_minute['DI'].iloc[index],             # durée d'insolation
-#    'RG':data_minute['RG'].iloc[index],             # rayonnement global
-    'FXI':data_minute['FM1'].iloc[index],           # vitesse maximale sur 10min          
+    'RG':data_minute['RG'].iloc[index],             # rayonnement global
+    'FXI':data_minute['FM1'].iloc[index],           # vitesse maximale sur 10min
     'FF':data_minute['FF'].iloc[index],             # vitesse moyenne sur 10min
     'DD':data_minute['DD'].iloc[index],             # direction moyenne sur 10min
     'U':data_minute['U'].iloc[index],               # humidité relative
-    'P':data_minute['PSTA'].iloc[index]             # pression au niveau de la station 
-    }, columns=['DATE','T','DI','RG','FXI','FF','DD','U','P'])
+    'P':data_minute['PSTA'].iloc[index],            # pression au niveau de la station
+    'VIS':data_minute['VVSYNTH'].iloc[index]        # pression au niveau de la station
+    }, columns=['DATE','T','DI','RG','FXI','FF','DD','U','P','VIS'])
 
   # Renvoie la dataframe
   return data_minute_final, True
@@ -133,12 +157,18 @@ def recuperation_donnees():
   if date_locale_debut >= date_locale_fin:
     sg.popup_ok("La date de début est postérieure ou égale à la date de fin !", title="Erreur", keep_on_top=True)
     return None, False
+  if date_locale_fin >= datetime.datetime.today():
+    sg.popup_ok("La date de fin est dans le futur !", title="Erreur", keep_on_top=True)
+    return None, False
+  if date_locale_debut >= datetime.datetime.today():
+    sg.popup_ok("La date de début est dans le futur !", title="Erreur", keep_on_top=True)
+    return None, False
 
   # Dates au format UTC
   date_debut = date_locale_debut - datetime.timedelta(hours=decalage[fuseau])
   date_fin = date_locale_fin - datetime.timedelta(hours=decalage[fuseau])
 
-  # Formatage des dates 
+  # Formatage des dates
   ddmmyyhhmm_debut = date_debut.strftime("%d%m%Y%H%M")
   ddmmyyhhmm_fin = date_fin.strftime("%d%m%Y%H%M")
   yymm_debut = date_debut.strftime("%Y%m")
@@ -171,9 +201,9 @@ def recuperation_donnees():
       # Dernier fichier
       date_fin_fichier = ddmmyyhhmm_fin
 
-    print("Lecture et nettoyage des données de : " + chemin_minute)
-    print("Date de début : " + date_debut_fichier)
-    print("Date de fin :   " + date_fin_fichier)
+    logging.info("Lecture et nettoyage des données de : " + chemin_minute)
+    logging.info("Date de début : " + date_debut_fichier)
+    logging.info("Date de fin :   " + date_fin_fichier)
 
     # Barre de progression
     if not sg.one_line_progress_meter('Récupération des données',
@@ -184,7 +214,7 @@ def recuperation_donnees():
                                       no_titlebar=True,
                                       grab_anywhere=True,
                                       no_button=True):
-      print('Hit the break')
+      logging.info('Hit the break')
       break
 
     if str(yymm) == yymm_debut:
@@ -193,27 +223,27 @@ def recuperation_donnees():
       if not success:
         sg.one_line_progress_meter_cancel(key='-barre-')
         return None, False
-      print("Nombre de ligne pour ce fichier : " + str(data.shape[0]))
+      logging.info("Nombre de ligne pour ce fichier : " + str(data.shape[0]))
     else:
       # Fichiers suivants
       dataTmp, success = recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichier)
       if not success:
         sg.one_line_progress_meter_cancel(key='-barre-')
         return None, False
-      print("Nombre de ligne pour ce fichier : " + str(dataTmp.shape[0]))
+      logging.info("Nombre de ligne pour ce fichier : " + str(dataTmp.shape[0]))
 
       # Concaténation avec la dataframe
       data = pd.concat([data, dataTmp], ignore_index=True)
 
   # Taille totale de la dataframe
-  print("Taille totale de la dataframe: " + str(data.shape[0]))
+  logging.info("Taille totale de la dataframe: " + str(data.shape[0]))
 
   # Renvoie la dataframe
   return data, True
 
 def write_data(data, P=False, T=False, Tres=False, FMOY=False, DMOY=False, FINS=False, DINS=False, HU=False, DI=False, RG=False, VIS=False) :
   # Ecriture d'un fichier csv
-  print("Le fichier csv est enregistré sous : " + emplacement_csv)
+  logging.info("Le fichier csv est enregistré sous : " + emplacement_csv)
   existence_repertoire(emplacement_csv)
 
   # Nom du fichier
@@ -221,9 +251,9 @@ def write_data(data, P=False, T=False, Tres=False, FMOY=False, DMOY=False, FINS=
 
   # Chemin complet
   chemin_csv = os.path.join(emplacement_csv, fichier_csv)
-  print("Nom du fichier csv: " + chemin_csv)
+  logging.info("Nom du fichier csv: " + chemin_csv)
 
-  # Sélection des données 
+  # Sélection des données
   list_data = []
   if T:
     list_data.append('T')
@@ -253,7 +283,7 @@ def write_data(data, P=False, T=False, Tres=False, FMOY=False, DMOY=False, FINS=
 
 def figure_vent(data,unite):
   # Trace le vent moyen
-  print("Le fichier png est enregistré sous : " + emplacement_figure)
+  logging.info("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
 
   # Nom du fichier
@@ -261,7 +291,7 @@ def figure_vent(data,unite):
 
   # Chemin complet
   chemin_figure = os.path.join(emplacement_figure, fichier_figure)
-  print("Nom du fichier png: " + chemin_figure)
+  logging.info("Nom du fichier png: " + chemin_figure)
 
   # Date
   data_date = data['DATE'] + datetime.timedelta(hours=decalage[fuseau])
@@ -289,9 +319,9 @@ def figure_vent(data,unite):
     ymax = 70
     seuil = 25
   else:
-    print("Unité de vent inconnue !")
+    logging.info("Unité de vent inconnue !")
     exit(1)
-   
+
   # Calculs des bornes de l'axe des ordonnées
   if max(data_FXI)+abs(ratio*max(data_FXI)) > ymax:
     bmax = ymax
@@ -317,19 +347,21 @@ def figure_vent(data,unite):
   ax.set_ylabel(f"Vent moyen et rafales [{str(unite)}]")
   ax.autoscale(axis='x', tight='true')
   fig.autofmt_xdate()
-  ax.set_title(f"Vent moyen et rafales - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  #ax.set_title(f"Vent moyen et rafales - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  ax.text(x=0.5, y=1.1 , s=f"Vent moyen et rafales", fontsize=16, weight='bold', ha='center', va='bottom', transform=ax.transAxes)
+  ax.text(x=0.5, y=1.05, s=f"Données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}", fontsize=8, alpha=0.75, ha='center', va='bottom', transform=ax.transAxes)
   _, ylim = ax.get_ylim()
   ax.set_ylim(bottom=bmin, top=bmax)
   l=4
   axins = inset_axes(ax, width=0.984 * l, height=0.157 * l, borderpad=0, loc="upper right")
   axins.imshow(logo, alpha=0.5)
   axins.axis('off')
- 
+
   return fig, ax, chemin_figure
 
 def figure_pression(data, unite):
   # Trace la pression atmosphérique
-  print("Le fichier png est enregistré sous : " + emplacement_figure)
+  logging.info("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
 
   # Nom du fichier
@@ -337,14 +369,14 @@ def figure_pression(data, unite):
 
   # Chemin complet
   chemin_figure = os.path.join(emplacement_figure, fichier_figure)
-  print("Nom du fichier png: " + chemin_figure)
+  logging.info("Nom du fichier png: " + chemin_figure)
 
   # Date
   data_date = data['DATE'] + datetime.timedelta(hours=decalage[fuseau])
 
   # Paramètres du graphe
   ratio = 0.002
-              
+   
   # Conversion à la demande
   if unite == 'mmHg':
     data_P = data['P']*0.75
@@ -355,9 +387,9 @@ def figure_pression(data, unite):
     ymin = 930
     ymax = 1020
   else:
-    print("Unité de pression inconnue !")
+    logging.error("Unité de pression inconnue !")
     exit(1)
-        
+
   # Calculs des bornes de l'axe des ordonnées
   if max(data_P)+abs(ratio*max(data_P)) > ymax:
     bmax = ymax
@@ -367,7 +399,7 @@ def figure_pression(data, unite):
     bmin = ymin
   else:
     bmin = min(data_P)-ratio*abs(min(data_P))
-        
+
   # Tracé du graphe
   fig, ax = plt.subplots(1, 1, figsize=(16, 9))
   ax.plot(np.array(data_date),np.array(data_P), linewidth=1, color='darkblue', label='P')
@@ -377,7 +409,9 @@ def figure_pression(data, unite):
   ax.set_ylabel(f"Pression atmosphérique [{str(unite)}]")
   ax.autoscale(axis='x', tight='true')
   fig.autofmt_xdate()
-  ax.set_title(f"Pression atmosphérique - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  #ax.set_title(f"Pression atmosphérique - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  ax.text(x=0.5, y=1.1 , s=f"Pression atmosphérique", fontsize=16, weight='bold', ha='center', va='bottom', transform=ax.transAxes)
+  ax.text(x=0.5, y=1.05, s=f"Données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}", fontsize=8, alpha=0.75, ha='center', va='bottom', transform=ax.transAxes)
   _, ylim = ax.get_ylim()
   ax.set_ylim(bottom=bmin, top=bmax)
   l=4
@@ -388,8 +422,8 @@ def figure_pression(data, unite):
   return fig, ax, chemin_figure
 
 def figure_temperature(data,unite):
-  # Trace la température sous abri et la température ressentie 
-  print("Le fichier png est enregistré sous : " + emplacement_figure)
+  # Trace la température sous abri et la température ressentie
+  logging.info("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
 
   # Nom du fichier
@@ -397,14 +431,14 @@ def figure_temperature(data,unite):
 
   # Chemin complet
   chemin_figure = os.path.join(emplacement_figure, fichier_figure)
-  print("Nom du fichier png: " + chemin_figure)
+  logging.info("Nom du fichier png: " + chemin_figure)
 
   # Date
   data_date = data['DATE'] + datetime.timedelta(hours=decalage[fuseau])
 
   # Calcul de la température ressentie
   data_Tres = 13.12+0.6215*(data['T'])+(0.3965*data['T']-11.37)*(data['FF']*3.6)**0.16
-    
+
   # Conversion à la demande
   if unite == '°C':
     data_T=data['T']
@@ -424,7 +458,7 @@ def figure_temperature(data,unite):
     ymin=-45+273.5
     ratio=0.002
   else:
-    print("Unité de température inconnue !")
+    logging.error("Unité de température inconnue !")
     exit(1)
 
   # Calculs des bornes de l'axe des ordonnées
@@ -436,7 +470,7 @@ def figure_temperature(data,unite):
     bmin = ymin
   else :
     bmin = min(data_Tres)-ratio*abs(min(data_Tres))
-        
+
   # Tracé du graphe
   fig, ax = plt.subplots(1, 1, figsize=(16, 9))
   ax.plot(np.array(data_date),np.array(data_T), linewidth=1, color='blue', label='T sous abri')
@@ -447,7 +481,9 @@ def figure_temperature(data,unite):
   ax.set_ylabel(f"Températures [{str(unite)}]")
   ax.autoscale(axis='x', tight='true')
   fig.autofmt_xdate()
-  ax.set_title(f"Températures - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  #ax.set_title(f"Températures - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  ax.text(x=0.5, y=1.1 , s=f"Températures", fontsize=16, weight='bold', ha='center', va='bottom', transform=ax.transAxes)
+  ax.text(x=0.5, y=1.05, s=f"Données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}", fontsize=8, alpha=0.75, ha='center', va='bottom', transform=ax.transAxes)
   _, ylim = ax.get_ylim()
   ax.set_ylim(bottom=bmin, top=bmax)
   handles, labels = ax.get_legend_handles_labels()
@@ -461,7 +497,7 @@ def figure_temperature(data,unite):
 
 def figure_humidite(data):
   # Trace l'humidité relative
-  print("Le fichier png est enregistré sous : " + emplacement_figure)
+  logging.info("Le fichier png est enregistré sous : " + emplacement_figure)
   existence_repertoire(emplacement_figure)
 
   # Nom du fichier
@@ -469,7 +505,7 @@ def figure_humidite(data):
 
   # Chemin complet
   chemin_figure = os.path.join(emplacement_figure, fichier_figure)
-  print("Nom du fichier png: " + chemin_figure)
+  logging.info("Nom du fichier png: " + chemin_figure)
 
   # Date
   data_date = data['DATE'] + datetime.timedelta(hours=decalage[fuseau])
@@ -480,7 +516,7 @@ def figure_humidite(data):
   unite = '%'
   ratio = 0.1
   data_U = data['U']
-   
+
   # Calculs des bornes de l'axe des ordonnées
   if max(data['U'])+abs(ratio*max(data['U'])) > ymax:
     bmax = ymax
@@ -500,7 +536,62 @@ def figure_humidite(data):
   ax.set_ylabel(f"Humidité relative [{str(unite)}]")
   ax.autoscale(axis='x', tight='true')
   fig.autofmt_xdate()
-  ax.set_title(f"Humidité relative - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  #ax.set_title(f"Humidité relative - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  ax.text(x=0.5, y=1.1 , s=f"Humidité Relative", fontsize=16, weight='bold', ha='center', va='bottom', transform=ax.transAxes)
+  ax.text(x=0.5, y=1.05, s=f"Données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}", fontsize=8, alpha=0.75, ha='center', va='bottom', transform=ax.transAxes)
+  #_, ylim = ax.get_ylim()  _, ylim = ax.get_ylim()
+  ax.set_ylim(bottom=bmin, top=bmax)
+  l=4
+  axins = inset_axes(ax, width=0.984 * l, height=0.157 * l, borderpad=0, loc="upper right")
+  axins.imshow(logo, alpha=0.5)
+  axins.axis('off')
+
+  return fig, ax, chemin_figure
+
+def figure_rayonnement(data):
+  # Trace le rayonnement global
+  logging.info("Le fichier png est enregistré sous : " + emplacement_figure)
+  existence_repertoire(emplacement_figure)
+
+  # Nom du fichier
+  fichier_figure = "graphe_RayonnementMinute_" + str(annee_debut) + str(mois_debut) + str(jour_debut) + str(heure_debut) + str(minute_debut) + '-' + str(annee_fin) + str(mois_fin) + str(jour_fin) + str(heure_fin) + str(minute_fin) + '.png'
+
+  # Chemin complet
+  chemin_figure = os.path.join(emplacement_figure, fichier_figure)
+  logging.info("Nom du fichier png: " + chemin_figure)
+
+  # Date
+  data_date = data['DATE'] + datetime.timedelta(hours=decalage[fuseau])
+
+  # Paramètres du graphe
+  ymax = 900
+  ymin = 0
+  unite = 'W/m2'
+  ratio = 0.1
+  data_RG = data['RG']/60
+
+  # Calculs des bornes de l'axe des ordonnées
+  if max(data_RG)+abs(ratio*max(data_RG)) > ymax:
+    bmax = ymax
+  else :
+    bmax = max(data_RG)+ratio*abs(max(data_RG))
+  if min(data_RG)-ratio*min(data_RG) < ymin:
+    bmin = ymin
+  else:
+    bmin = min(data_RG)-ratio*abs(min(data_RG))
+
+  # Tracé du graphe
+  fig, ax = plt.subplots(1, 1, figsize=(16, 9))
+  ax.plot(np.array(data_date),np.array(data_RG), linewidth=1, color='darkblue', label='P')
+  ax.axhline(0, color='grey', linestyle='--')
+#  ax.grid(b=True, which='both', axis='both', color='lightgrey', zorder=1)
+  ax.set_xlabel(f"date et heure {str(fuseau)}")
+  ax.set_ylabel(f"Rayonnement Global [{str(unite)}]")
+  ax.autoscale(axis='x', tight='true')
+  fig.autofmt_xdate()
+  #ax.set_title(f"Rayonnement Global - données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}, heure {str(fuseau)}", fontsize=15)
+  ax.text(x=0.5, y=1.1 , s=f"Rayonnement global", fontsize=16, weight='bold', ha='center', va='bottom', transform=ax.transAxes)
+  ax.text(x=0.5, y=1.05, s=f"Données minutes du {min(data_date).strftime('%d')} {min(data_date).strftime('%h')} {min(data_date).strftime('%Y')} à {min(data_date).strftime('%H:%M')} au {max(data_date).strftime('%d')} {max(data_date).strftime('%h')} {max(data_date).strftime('%Y')} à {max(data_date).strftime('%H:%M')}", fontsize=8, alpha=0.75, ha='center', va='bottom', transform=ax.transAxes)
   _, ylim = ax.get_ylim()
   ax.set_ylim(bottom=bmin, top=bmax)
   l=4
@@ -540,8 +631,8 @@ if (__name__ == "__main__"):
   jours = ["{:02d}".format(x) for x in range(1,32)]
   mois = ["{:02d}".format(x) for x in range(1,13)]
   annees = ["{:04d}".format(x) for x in range(1900,2100)]
-  heures = ["{:02d}".format(x) for x in range(1,25)]
-  minutes = ["{:02d}".format(x) for x in range(1,61)]
+  heures = ["{:02d}".format(x) for x in range(0,24)]
+  minutes = ["{:02d}".format(x) for x in range(0,60)]
   decalage = {'UTC':0, 'DDU':10}
   logo = plt.imread("logo_MF.png")
   vide = "  mémoire vide - récupération requise !"
@@ -620,7 +711,7 @@ if (__name__ == "__main__"):
                             sg.Combo(mois, size=(3, 1), default_value=mois_debut, enable_events=True ,key='-mois_debut-', bind_return_key='-mois_debut-'),
                             sg.Combo(annees, size=(5, 1), default_value=annee_debut, enable_events=True ,key='-annee_debut-', bind_return_key='-annee_debut-'),
                             sg.Button('Cal', key='-selection_date_debut-'),
-                            sg.Text('Heure de début: ', size=13),
+                            sg.Text('Heure de début : ', size=13),
                             sg.Combo(heures, size=(3, 1), default_value=heure_debut, enable_events=True ,key='-heure_debut-', bind_return_key='-heure_debut-'),
                             sg.Combo(minutes, size=(3, 1), default_value=minute_debut, enable_events=True ,key='-minute_debut-', bind_return_key='-minute_debut-') ] ]
 
@@ -629,10 +720,10 @@ if (__name__ == "__main__"):
                           sg.Combo(mois, size=(3, 1), default_value=mois_fin, enable_events=True ,key='-mois_fin-', bind_return_key='-mois_fin-'),
                           sg.Combo(annees, size=(5, 1), default_value=annee_fin, enable_events=True ,key='-annee_fin-', bind_return_key='-annee_fin-'),
                           sg.Button('Cal', key='-selection_date_fin-'),
-                          sg.Text('Heure de fin: ', size=13),
+                          sg.Text('Heure de fin : ', size=13),
                           sg.Combo(heures, size=(3, 1), default_value=heure_fin, enable_events=True ,key='-heure_fin-', bind_return_key='-heure_fin-'),
                           sg.Combo(minutes, size=(3, 1), default_value=minute_fin, enable_events=True ,key='-minute_fin-', bind_return_key='-minute_fin-') ] ]
- 
+
 
   layout_date_temps = sg.Column( [ [ sg.Column(sg_date_temps_debut, element_justification='c') ],
                                    [ sg.Column(sg_date_temps_fin, element_justification='c') ] ],
@@ -641,8 +732,8 @@ if (__name__ == "__main__"):
   ## Frame 2.2 : décalage horaire
   sg_decalage = sg.Column( [ [ sg.Radio('UTC (+00)', size=(15,1), group_id=1, default=(fuseau=='UTC'), enable_events=True, key='-decalage_utc-') ],
                              [ sg.Radio('DDU (+10)', size=(15,1), group_id=1, default=(fuseau=='DDU'), enable_events=True, key='-decalage_ddu-') ]  ],
-                           element_justification='c') 
-   
+                           element_justification='c')
+
   ## Frame 2 : date / heure / décalage horaire
   frame_layout_date_temps_decalage = [ [ sg.Column( [ [ layout_date_temps, sg_decalage] ], element_justification='c' ) ] ]
 
@@ -686,7 +777,7 @@ if (__name__ == "__main__"):
   layout_gauche = [ [ sg.Frame('Emplacements', frame_layout_emplacement, expand_x=True) ],
                     [ sg.Frame('Dates / heures / décalage horaire ', frame_layout_date_temps_decalage, expand_x=True) ],
                     [ sg.Frame('Récupération des données', frame_donnees, expand_x=True) ],
-                    [ sg.Frame('Plot / export PNG', frame_figure, expand_x=True), sg.Image("logo_MF.png") ],
+                    [ sg.Frame('Figure / export PNG', frame_figure, expand_x=True), sg.Image("logo_MF.png") ],
                     [ sg.Frame('Export CSV', frame_csv, expand_x=True) ],
                     [ sg.Image("ddu.png", size=(800, 320)) ] ]
 
@@ -697,14 +788,14 @@ if (__name__ == "__main__"):
   layout = [ [ sg.Column(layout_gauche, element_justification='c', vertical_alignment='top'), sg.Column(layout_droite, element_justification='c', vertical_alignment='top') ] ]
 
   ## Création de la fenêtre
-  window = sg.Window('MINUTE - DDU', layout, resizable=True)    
+  window = sg.Window('Visualisation simple des fichiers "minutes" - DDU', layout, resizable=True)
 
   # Gestion des événements
   while True:
     ## Récupération de l'événement et des valeurs
     event, values = window.read()
     if event != None:
-      print("Event: " + event)
+      logging.info("Event: " + event)
 
     ## Quitter normalement
     if event in (sg.WIN_CLOSED, 'Exit'):
@@ -712,52 +803,52 @@ if (__name__ == "__main__"):
 
     ## Emplacements
     if event == '-emplacement_minute-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       emplacement_minute = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-emplacement_figure-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       emplacement_figure = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-emplacement_csv-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       emplacement_csv = values[event]
       sg.user_settings_set_entry(event, values[event])
 
     ## Date / heure de début
     if event == '-jour_debut-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       jour_debut = values[event].zfill(2)
       window[event].update(jour_debut)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-mois_debut-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       mois_debut = values[event].zfill(2)
       window[event].update(mois_debut)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-annee_debut-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       annee_debut = values[event].zfill(4)
       window[event].update(annee_debut)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-heure_debut-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       heure_debut = values[event].zfill(2)
       window[event].update(heure_debut)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-minute_debut-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       minute_debut = values[event].zfill(2)
       window[event].update(minute_debut)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-selection_date_debut-':
       date_debut_tuple = sg.popup_get_date(start_mon=int(mois_debut), start_day=int(jour_debut), start_year=int(annee_debut), begin_at_sunday_plus=1, title="Date de début")
-      print("Tuple:" + date_debut_tuple)
+      logging.info("Tuple:" + date_debut_tuple)
       jour_debut = str(date_debut_tuple[1]).zfill(2)
       mois_debut = str(date_debut_tuple[0]).zfill(2)
       annee_debut = str(date_debut_tuple[2]).zfill(2)
@@ -770,38 +861,38 @@ if (__name__ == "__main__"):
 
     ## Date / heure de fin
     if event == '-jour_fin-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       jour_fin = values[event].zfill(2)
       window[event].update(jour_fin)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-mois_fin-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       mois_fin = values[event].zfill(2)
       window[event].update(mois_fin)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-annee_fin-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       annee_fin = values[event].zfill(4)
       window[event].update(annee_fin)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-heure_fin-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       heure_fin = values[event].zfill(2)
       window[event].update(heure_fin)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-minute_fin-':
-      print("Value: " + values[event])
+      logging.info("Value: " + values[event])
       minute_fin = values[event].zfill(2)
       window[event].update(minute_fin)
       modification_date(window)
       sg.user_settings_set_entry(event, values[event])
     if event == '-selection_date_fin-':
       date_fin_tuple = sg.popup_get_date(start_mon=int(mois_fin), start_day=int(jour_fin), start_year=int(annee_fin), begin_at_sunday_plus=1, title="Date de début")
-      print("Tuple:" + date_fin_tuple)
+      logging.info("Tuple:" + date_fin_tuple)
       jour_fin = str(date_fin_tuple[1]).zfill(2)
       mois_fin = str(date_fin_tuple[0]).zfill(2)
       annee_fin = str(date_fin_tuple[2]).zfill(2)
@@ -814,11 +905,11 @@ if (__name__ == "__main__"):
 
     ## Décalage horaire
     if event == '-decalage_utc-':
-      print("Fuseau: UTC")
+      logging.info("Fuseau: UTC")
       fuseau = 'UTC'
       sg.user_settings_set_entry('-fuseau-', fuseau)
     if event == '-decalage_ddu-':
-      print("Fuseau: DDU")
+      logging.info("Fuseau: DDU")
       fuseau = 'DDU'
       sg.user_settings_set_entry('-fuseau-', fuseau)
 
@@ -832,18 +923,18 @@ if (__name__ == "__main__"):
     ## Figure vent
     if event == '-unite_vent_ms-':
       unite_vent = 'm/s'
-      print("unite_vent:" + unite_vent)
+      logging.info("unite_vent:" + unite_vent)
       sg.user_settings_set_entry('-unite_vent-', unite_vent)
     if event == '-unite_vent_kmh-':
       unite_vent = 'km/h'
-      print("unite_vent:" + unite_vent)
+      logging.info("unite_vent:" + unite_vent)
       sg.user_settings_set_entry('-unite_vent-', unite_vent)
     if event == '-unite_vent_kt-':
       unite_vent = 'kt'
-      print("unite_vent:" + unite_vent)
+      logging.info("unite_vent:" + unite_vent)
       sg.user_settings_set_entry('-unite_vent-', unite_vent)
     if event == '-figure_vent-':
-      print("figure_vent")
+      logging.info("figure_vent")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
@@ -855,14 +946,14 @@ if (__name__ == "__main__"):
     ## Figure pression
     if event == '-unite_pression_mmhg-':
       unite_pression = 'mmHg'
-      print("unite_pression:" + unite_pression)
+      logging.info("unite_pression:" + unite_pression)
       sg.user_settings_set_entry('-unite_pression-', unite_pression)
     if event == '-unite_pression_hpa-':
       unite_pression = 'hPa'
-      print("unite_pression:" + unite_pression)
+      logging.info("unite_pression:" + unite_pression)
       sg.user_settings_set_entry('-unite_pression-', unite_pression)
     if event == '-figure_pression-':
-      print("figure_pression")
+      logging.info("figure_pression")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
@@ -874,18 +965,18 @@ if (__name__ == "__main__"):
     ## Figure température
     if event == '-unite_temperature_c-':
       unite_temperature = '°C'
-      print("unite_temperature:" + unite_temperature)
+      logging.info("unite_temperature:" + unite_temperature)
       sg.user_settings_set_entry('-unite_temperature-', unite_temperature)
     if event == '-unite_temperature_f-':
       unite_temperature = '°F'
-      print("unite_temperature:" + unite_temperature)
+      logging.info("unite_temperature:" + unite_temperature)
       sg.user_settings_set_entry('-unite_temperature-', unite_temperature)
     if event == '-unite_temperature_k-':
       unite_temperature = 'K'
-      print("unite_temperature:" + unite_temperature)
+      logging.info("unite_temperature:" + unite_temperature)
       sg.user_settings_set_entry('-unite_temperature-', unite_temperature)
     if event == '-figure_temperature-':
-      print("figure_temperature")
+      logging.info("figure_temperature")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
@@ -896,7 +987,7 @@ if (__name__ == "__main__"):
 
     ## Figure humidité
     if event == '-figure_humidite-':
-      print("figure_humidite")
+      logging.info("figure_humidite")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
@@ -907,19 +998,18 @@ if (__name__ == "__main__"):
 
     ## Figure rayonnement
     if event == '-figure_rayonnement-':
-      print("figure_rayonnement")
+      logging.info("figure_rayonnement")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
-        sg.popup_ok("Pas de encore de figure pour le rayonnement ", title="Erreur", keep_on_top=True)
-#        if 'tkcanvas' in globals():
-#          tkcanvas.get_tk_widget().destroy()
-#        fig, ax, chemin_figure = figure_rayonnement(data)
-#        tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
+        if 'tkcanvas' in globals():
+          tkcanvas.get_tk_widget().destroy()
+        fig, ax, chemin_figure = figure_rayonnement(data)
+        tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
 
     ## Figure beaufort
     if event == '-figure_beaufort-':
-      print("figure_beaufort")
+      logging.info("figure_beaufort")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
@@ -940,31 +1030,31 @@ if (__name__ == "__main__"):
 
     ## Paramètres csv
     if event == '-csv_p-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_p = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-csv_t-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_t = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-csv_ff-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_ff = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-csv_dd-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_dd = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-csv_fi-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_fi = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-csv_u-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_u = values[event]
       sg.user_settings_set_entry(event, values[event])
     if event == '-csv_vis-':
-      print("Value: " + str(values[event]))
+      logging.info("Value: " + str(values[event]))
       csv_vis = values[event]
       sg.user_settings_set_entry(event, values[event])
 
@@ -973,7 +1063,7 @@ if (__name__ == "__main__"):
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
-        print("export_csv")
+        logging.info("export_csv")
         write_data(data=data, P=csv_p, T=csv_t, FMOY=csv_ff, DMOY=csv_dd, FINS=csv_fi, HU=csv_u, VIS=csv_vis)
 
   # Fermeture de la fenêtre
