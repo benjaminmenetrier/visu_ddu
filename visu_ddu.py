@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on January 2024
+Created on Juillet 2024
 @author : Rachel Honnert TA74 et Benjamin Ménétrier
 
-Ce script crée une interface graphique permettant de visualiser les données des fichiers "minute" du Cobalt ,
+Ce script crée une interface graphique (GUI) permettant de visualiser les données des fichiers "minute" du Cobalt ,
 d'exporter au format png les plots et d'exporter les données au format "png".
 
 Utilisation :
-    python visu_ddu.py
+    python visu_ddu.py ou double clic sur un bouton du bureau : VISU_DDU
 
 Il fonctionne en python3.12 et a besoin des librairies :
     - calendar
@@ -22,7 +22,11 @@ Il fonctionne en python3.12 et a besoin des librairies :
     -.FreeSimpleGUI ou à défaut PySimpleGUI
     - logging
 
-A partir des scripts de Laura Chataignier TA71
+Graphics : Vent (m/s,kt,km/h), Humidité,Température,Pression
+Export : PSTA;T;U;DD;FF;FM1;VVSYNTH;
+
+Modifications : 
+     Août 2024 : Les images sont crées à partir de scripts originellement mis en place par Laura Chataignier (TA71) puis des modifications successives. En particulier ici pour une meilleure visualisation sous PySimpleGUI les titres ont été modifiés.
 """
 
 # Chargement des librairies
@@ -59,7 +63,6 @@ register_matplotlib_converters()
 #
 #logging.basicConfig( filename="py_log.log",filemode="w")
 logging.basicConfig(level=logging.DEBUG, filename="py_log.log",filemode="w")
-
 ############# DEFINITION DES FONCTIONS #############
 
 ### Environnement de travail :
@@ -117,6 +120,8 @@ def recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichie
     sg.popup_ok("Pas de date pertinente dans ce fichier (index_debut)", title="Erreur", keep_on_top=True)
     return None, False
 
+
+
   # Restrictions des données entre index_debut et index_fin
   data_minute = data_minute.iloc[index_debut:index_fin+1,:]
 
@@ -128,10 +133,12 @@ def recuperation_donnees_mois(chemin_minute, date_debut_fichier, date_fin_fichie
   for param in data_minute.columns[2:14]:
     data_minute[param] = pd.to_numeric(data_minute[param])
 
+
   # Création d'un index, tri des données
   data_minute.set_index(['date'], inplace=True)
   data_minute.sort_index(ascending=True, inplace=True)
 
+ 
   # Enregistrement de la dataframe
   index = np.where(data_minute['ddmmyyyyhhmm'].notnull())[0]
   data_minute_final = pd.DataFrame({
@@ -322,6 +329,7 @@ def figure_vent(data,unite):
     logging.info("Unité de vent inconnue !")
     exit(1)
 
+
   # Calculs des bornes de l'axe des ordonnées
   if max(data_FXI)+abs(ratio*max(data_FXI)) > ymax:
     bmax = ymax
@@ -376,7 +384,8 @@ def figure_pression(data, unite):
 
   # Paramètres du graphe
   ratio = 0.002
-   
+
+
   # Conversion à la demande
   if unite == 'mmHg':
     data_P = data['P']*0.75
@@ -390,6 +399,7 @@ def figure_pression(data, unite):
     logging.error("Unité de pression inconnue !")
     exit(1)
 
+
   # Calculs des bornes de l'axe des ordonnées
   if max(data_P)+abs(ratio*max(data_P)) > ymax:
     bmax = ymax
@@ -399,6 +409,7 @@ def figure_pression(data, unite):
     bmin = ymin
   else:
     bmin = min(data_P)-ratio*abs(min(data_P))
+
 
   # Tracé du graphe
   fig, ax = plt.subplots(1, 1, figsize=(16, 9))
@@ -439,6 +450,7 @@ def figure_temperature(data,unite):
   # Calcul de la température ressentie
   data_Tres = 13.12+0.6215*(data['T'])+(0.3965*data['T']-11.37)*(data['FF']*3.6)**0.16
 
+
   # Conversion à la demande
   if unite == '°C':
     data_T=data['T']
@@ -470,6 +482,7 @@ def figure_temperature(data,unite):
     bmin = ymin
   else :
     bmin = min(data_Tres)-ratio*abs(min(data_Tres))
+
 
   # Tracé du graphe
   fig, ax = plt.subplots(1, 1, figsize=(16, 9))
@@ -516,6 +529,7 @@ def figure_humidite(data):
   unite = '%'
   ratio = 0.1
   data_U = data['U']
+
 
   # Calculs des bornes de l'axe des ordonnées
   if max(data['U'])+abs(ratio*max(data['U'])) > ymax:
@@ -570,6 +584,7 @@ def figure_rayonnement(data):
   ratio = 0.1
   data_RG = data['RG']/60
 
+
   # Calculs des bornes de l'axe des ordonnées
   if max(data_RG)+abs(ratio*max(data_RG)) > ymax:
     bmax = ymax
@@ -600,6 +615,7 @@ def figure_rayonnement(data):
   axins.axis('off')
 
   return fig, ax, chemin_figure
+
 
 def get_dpi():
   # Récupération du DPI de l'écran
@@ -691,15 +707,15 @@ if (__name__ == "__main__"):
   ## Frame 1 : emplacements
   sg_emplacement_minute = [ [ sg.Text('Fichiers minute', size=13),
                               sg.In(size=(80,1), enable_events=True ,key='-emplacement_minute-', default_text=emplacement_minute),
-                              sg.FolderBrowse() ] ]
+                              sg.FolderBrowse("Répertoires") ] ]
 
   sg_emplacement_csv = [ [sg.Text('Fichiers csv', size=13),
                           sg.In(size=(80,1), enable_events=True ,key='-emplacement_csv-', default_text=emplacement_csv),
-                          sg.FolderBrowse() ] ]
+                          sg.FolderBrowse("Répertoires") ] ]
 
   sg_emplacement_figure = [ [ sg.Text('Figures', size=13),
                               sg.In(size=(80,1), enable_events=True ,key='-emplacement_figure-', default_text=emplacement_figure),
-                              sg.FolderBrowse() ] ]
+                              sg.FolderBrowse("Répertoires") ] ]
 
   frame_layout_emplacement = [ [ sg.Column(sg_emplacement_minute, element_justification='c') ],
                                [ sg.Column(sg_emplacement_csv, element_justification='c') ],
@@ -733,7 +749,6 @@ if (__name__ == "__main__"):
   sg_decalage = sg.Column( [ [ sg.Radio('UTC (+00)', size=(15,1), group_id=1, default=(fuseau=='UTC'), enable_events=True, key='-decalage_utc-') ],
                              [ sg.Radio('DDU (+10)', size=(15,1), group_id=1, default=(fuseau=='DDU'), enable_events=True, key='-decalage_ddu-') ]  ],
                            element_justification='c')
-
   ## Frame 2 : date / heure / décalage horaire
   frame_layout_date_temps_decalage = [ [ sg.Column( [ [ layout_date_temps, sg_decalage] ], element_justification='c' ) ] ]
 
@@ -748,8 +763,9 @@ if (__name__ == "__main__"):
   sg_figure = [ [ sg.Button('Vent', size=(12,1), enable_events=True ,key='-figure_vent-'),
                   sg.Radio('m/s', size=(7,1), group_id=2, default=(unite_vent=='m/s'), enable_events=True, key='-unite_vent_ms-'),
                   sg.Radio('km/h', size=(7,1), group_id=2, default=(unite_vent=='km/h'), enable_events=True, key='-unite_vent_kmh-'),
-                  sg.Radio('kt', size=(7,1), group_id=2, default=(unite_vent=='kt'), enable_events=True, key='-unite_vent_kt-'),  ],
-                [ sg.Button('Pression', size=(12,1), enable_events=True ,key='-figure_pression-'),
+                  sg.Radio('kt', size=(7,1), group_id=2, default=(unite_vent=='kt'), enable_events=True, key='-unite_vent_kt-'),
+                  sg.Radio('beaufort', size=(7,1), group_id=2, default=(unite_vent=='kt'), enable_events=True, key='-unite_vent_bf-'),  ],
+                  [ sg.Button('Pression', size=(12,1), enable_events=True ,key='-figure_pression-'),
                   sg.Radio('mmHg', size=(7,1), group_id=3, default=(unite_pression=='mmHg'), enable_events=True, key='-unite_pression_mmhg-'),
                   sg.Radio('hPa', size=(7,1), group_id=3, default=(unite_pression=='hPa'), enable_events=True, key='-unite_pression_hpa-')  ],
                 [ sg.Button('Temperature', size=(12,1), enable_events=True ,key='-figure_temperature-'),
@@ -758,7 +774,7 @@ if (__name__ == "__main__"):
                   sg.Radio('K', size=(7,1), group_id=4, default=(unite_temperature=='K'), enable_events=True, key='-unite_temperature_k-'),  ],
                 [ sg.Button('Humidité', size=(12,1), enable_events=True ,key='-figure_humidite-') ],
                 [ sg.Button('Rayonnement', size=(12,1), enable_events=True ,key='-figure_rayonnement-') ],
-                [ sg.Button('Beaufort', size=(12,1), enable_events=True ,key='-figure_beaufort-') ],
+                [ sg.Button('Autres', size=(12,1), enable_events=True ,key='-figure_autres-') ],
                 [ sg.Button('Exporter la figure en PNG', enable_events=True ,key='-export_figure-', expand_x=True) ] ]
 
   sg_export_csv = [ [ sg.Checkbox('P', default=csv_p, enable_events=True, key='-csv_p-'),
@@ -848,16 +864,22 @@ if (__name__ == "__main__"):
       sg.user_settings_set_entry(event, values[event])
     if event == '-selection_date_debut-':
       date_debut_tuple = sg.popup_get_date(start_mon=int(mois_debut), start_day=int(jour_debut), start_year=int(annee_debut), begin_at_sunday_plus=1, title="Date de début")
-      logging.info("Tuple:" + date_debut_tuple)
-      jour_debut = str(date_debut_tuple[1]).zfill(2)
-      mois_debut = str(date_debut_tuple[0]).zfill(2)
-      annee_debut = str(date_debut_tuple[2]).zfill(2)
-      window['-jour_debut-'].update(jour_debut)
-      window['-mois_debut-'].update(mois_debut)
-      window['-annee_debut-'].update(annee_debut)
-      sg.user_settings_set_entry('-jour_debut-', values[jour_debut])
-      sg.user_settings_set_entry('-mois_debut-', values[mois_debut])
-      sg.user_settings_set_entry('-annee_debut-', values[annee_debut])
+      logging.info("Tuple:" + str(date_debut_tuple))
+      if date_debut_tuple is not None:
+        jour_debut = str(date_debut_tuple[1]).zfill(2)
+        mois_debut = str(date_debut_tuple[0]).zfill(2)
+        annee_debut = str(date_debut_tuple[2]).zfill(2)
+        window['-jour_debut-'].update(jour_debut)
+        window['-mois_debut-'].update(mois_debut)
+        window['-annee_debut-'].update(annee_debut)
+        datetime_str = mois_debut+'/'+jour_debut+'/'+annee_debut+' 00:00:00'
+        datetime_object = datetime.datetime.strptime(datetime_str, '%m/%d/%Y %H:%M:%S')
+        if datetime_object >= datetime.datetime.today():
+          sg.popup_ok("La date de debut est dans le futur !", title="Erreur", keep_on_top=True)
+        else:
+          sg.user_settings_set_entry('-jour_debut-', values[jour_debut])
+          sg.user_settings_set_entry('-mois_debut-', values[mois_debut])
+          sg.user_settings_set_entry('-annee_debut-', values[annee_debut])
 
     ## Date / heure de fin
     if event == '-jour_fin-':
@@ -892,16 +914,22 @@ if (__name__ == "__main__"):
       sg.user_settings_set_entry(event, values[event])
     if event == '-selection_date_fin-':
       date_fin_tuple = sg.popup_get_date(start_mon=int(mois_fin), start_day=int(jour_fin), start_year=int(annee_fin), begin_at_sunday_plus=1, title="Date de début")
-      logging.info("Tuple:" + date_fin_tuple)
-      jour_fin = str(date_fin_tuple[1]).zfill(2)
-      mois_fin = str(date_fin_tuple[0]).zfill(2)
-      annee_fin = str(date_fin_tuple[2]).zfill(2)
-      window['-jour_fin-'].update(jour_fin)
-      window['-mois_fin-'].update(mois_fin)
-      window['-annee_fin-'].update(annee_fin)
-      sg.user_settings_set_entry('-jour_fin-', values[jour_fin])
-      sg.user_settings_set_entry('-mois_fin-', values[mois_fin])
-      sg.user_settings_set_entry('-annee_debut-', values[annee_debut])
+      logging.info("Tuple:" + str(date_fin_tuple))
+      if date_fin_tuple is not None:
+        jour_fin = str(date_fin_tuple[1]).zfill(2)
+        mois_fin = str(date_fin_tuple[0]).zfill(2)
+        annee_fin = str(date_fin_tuple[2]).zfill(2)
+        window['-jour_fin-'].update(jour_fin)
+        window['-mois_fin-'].update(mois_fin)
+        window['-annee_fin-'].update(annee_fin)
+        datetime_str = mois_fin+'/'+jour_fin+'/'+annee_fin+' 00:00:00'
+        datetime_object = datetime.datetime.strptime(datetime_str, '%m/%d/%Y %H:%M:%S')
+        if datetime_object >= datetime.datetime.today():
+          sg.popup_ok("La date de fin est dans le futur !", title="Erreur", keep_on_top=True)
+        else:
+          sg.user_settings_set_entry('-jour_fin-', values[jour_fin])
+          sg.user_settings_set_entry('-mois_fin-', values[mois_fin])
+          sg.user_settings_set_entry('-annee_fin-', values[annee_fin])
 
     ## Décalage horaire
     if event == '-decalage_utc-':
@@ -933,6 +961,11 @@ if (__name__ == "__main__"):
       unite_vent = 'kt'
       logging.info("unite_vent:" + unite_vent)
       sg.user_settings_set_entry('-unite_vent-', unite_vent)
+    if event == '-unite_vent_bf-':
+      unite_vent = 'kt'
+      logging.info("unite_vent:" + unite_vent)
+      sg.user_settings_set_entry('-unite_vent-', unite_vent)
+      sg.popup_ok("Pas de encore de figure pour ce bouton ", title="Erreur", keep_on_top=True)
     if event == '-figure_vent-':
       logging.info("figure_vent")
       if donnees_en_memoire == vide:
@@ -940,8 +973,11 @@ if (__name__ == "__main__"):
       else:
         if 'tkcanvas' in globals():
           tkcanvas.get_tk_widget().destroy()
-        fig, ax, chemin_figure = figure_vent(data, unite_vent)
-        tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
+        if event == '-unite_vent_bf-':
+          sg.popup_ok("Pas encore de figure pour les indices beaufort", title="Erreur", keep_on_top=True)
+        else:
+          fig, ax, chemin_figure = figure_vent(data, unite_vent)
+          tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
 
     ## Figure pression
     if event == '-unite_pression_mmhg-':
@@ -1006,14 +1042,16 @@ if (__name__ == "__main__"):
           tkcanvas.get_tk_widget().destroy()
         fig, ax, chemin_figure = figure_rayonnement(data)
         tkcanvas = affichage_figure(window['-CANVAS-'].TKCanvas, fig)
+                                                                                                                    
 
-    ## Figure beaufort
-    if event == '-figure_beaufort-':
-      logging.info("figure_beaufort")
+
+    ## Figure autres
+    if event == '-figure_autres-':
+      logging.info("figure_autres")
       if donnees_en_memoire == vide:
         sg.popup_ok("Mémoire vide... Récupérez des données et recommencez !", title="Erreur", keep_on_top=True)
       else:
-        sg.popup_ok("Pas de encore de figure pour l'indice beaufort ", title="Erreur", keep_on_top=True)
+        sg.popup_ok("Pas de encore de figure pour ce bouton ", title="Erreur", keep_on_top=True)
 #        if 'tkcanvas' in globals():
 #          tkcanvas.get_tk_widget().destroy()
 #        fig, ax, chemin_figure = figure_beaufort(data)
