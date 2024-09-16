@@ -28,7 +28,7 @@ def lecture_rs_cor(date,AltTropo):
 
   dossier = sorted([f for f in os.listdir(emplacement_rs) if '.cor' in f]) # list tous les .cor du fichier
   radical_fichier_mf = 'DD' + annee + mois + jour # je recherche le fichier du jour en question 
-  alt_tot,T_tot,FF_tot,DD_tot,Lat_tot,Lon_tot = [], [], [], [], [], [] # je recupère l'altitude, la pression, la température, l'humidité, vent ff et direction, vitesse ascendente
+  P_tot,alt_tot,T_tot,FF_tot,DD_tot,Lat_tot,Lon_tot = [], [], [], [], [], [], [] # je recupère l'altitude, la pression, la température, l'humidité, vent ff et direction, vitesse ascendente
   if [f for f in dossier if radical_fichier_mf in f] == []: # Si le dossier est vide, on affiche un message signalant qu'il n'y a pas de mesure pour cette date
     print("Il n'y a pas de mesure météo france pour cette date")
   else:
@@ -40,6 +40,7 @@ def lecture_rs_cor(date,AltTropo):
     for i in range(1, len(lines)):
       tmp = lines[i].replace('\n', '').replace('\r','').replace(';', '\t').split('\t')
       if len(tmp) > 1:
+        P_tot.append(float(tmp[12]))          # Pression atmosphérique hPa
         alt_tot.append(float(tmp[1]))
         Lat_tot.append(float(tmp[2]))   # Delta de latitude 
         Lon_tot.append(float(tmp[3]))   # Delta de longitude        
@@ -53,6 +54,7 @@ def lecture_rs_cor(date,AltTropo):
       imax=alt_tot.index(max(alt_tot))
       Tmin=min(T_tot[0:imax])
       itropo=alt_tot[0:imax].index(min(alt_tot[0:imax], key=lambda x:abs(x-AltTropo)))
+      PAltMax=round(P_tot[imax],1)
       TTropo=T_tot[itropo]
       FFVMax=round(max(FF_tot)/0.51444)
       ivmax=FF_tot.index(max(FF_tot))
@@ -67,7 +69,7 @@ def lecture_rs_cor(date,AltTropo):
       a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
       c = 2 * atan2(sqrt(a), sqrt(1 - a))
       DO = round(R * c,1)
-  return Tmin,TTropo,FFVMax,DDVMax,AltVMax,DO # 
+  return Tmin,TTropo,FFVMax,DDVMax,AltVMax,DO,PAltMax # 
 
 def lecture_rs_ref(date):
   # récupération des données RS des fichiers REF
@@ -76,48 +78,47 @@ def lecture_rs_ref(date):
   mois = date[3:5]
   annee = date[6:10]
   filename=os.path.join(emplacement_rs,"DD"+annee+mois+jour+'00_1.ref')
+  print(filename)
   with open(filename,'r') as f:
-    s=f.read().replace('\r\n', '\n').replace('\r', '\n')
-    lines=s.split('\n')
-  # A/ Date <= à partir de l'heure de lancé
-  # B/ Date UTC <= à partir de l'heure de lancé
-  # D/ SondeStart (heure de départ)
-    tmp=lines[19].split('=')
-    SondeStart=tmp[1][:-3]
-  # E/ SondeID 
-    tmp=lines[3].split('=')
-    SondeID=tmp[1]
-  # F/ GroundP
-    tmp=lines[49].split('=')
-    GroundP=float(tmp[1][:-3])
-  # G/ GroundClouds
-    tmp=lines[54].split('=')
-    GroundClouds=tmp[1]
-  # H/ GroundWindSpeed
-    tmp=lines[52].split('=')
-    GroundWindSpeed=float(tmp[1][:-3])
-  # I/ GroundWindDir (KT)
-    tmp=lines[53].split('=')
-    GroundWindDir=int(float(tmp[1][:-1]))
-  # J/ GroundT
-    tmp=lines[50].split('=')
-    GroundT=float(tmp[1][:-2])
-  # K/ GroundU
-    tmp=lines[51].split('=')
-    GroundU=int(float(tmp[1][:-1]))
-  # S/ Altitude de la tropo
-    tmp=lines[21].replace('='," ").split(" ")
-    TropoAlt=int(float(tmp[1][:-1]))
-  # AB/ altitude maximale  
-    tmp=lines[6].split('=')
-    FinPTU=int(float(tmp[1][:-1]))
-  # AC/ pression de l'altitude maximale 
-    tmp=lines[5].split('=')
-    FinPTUP=round(float(tmp[1][:-3]),1)
-  # Y/ Ascent=5.1m/s (VA) => à changer en m/mn
-    tmp=lines[8].split('=')
-    tmp2=tmp[1][:-3]
-    Ascent=round(float(tmp2)/0.514444,1)
+    for line in f:
+      if line.startswith('SondeID'):
+        tmp=line.rstrip('\n').split('=')
+        SondeID=tmp[1]
+      elif line.startswith('GroundP'):
+        tmp=line.rstrip('\n').split('=')
+        GroundP=float(tmp[1][:-3])
+      elif line.startswith('GroundClouds'):
+        tmp=line.rstrip('\n').split('=')
+        GroundClouds=tmp[1]
+      elif line.startswith('GroundWindSpeed'):
+        tmp=line.rstrip('\n').split('=')
+        GroundWindSpeed=float(tmp[1][:-3])
+      elif line.startswith('GroundWindDir'):
+        tmp=line.rstrip('\n').split('=')
+        GroundWindDir=int(float(tmp[1][:-1]))
+      elif line.startswith('GroundT'):
+        tmp=line.rstrip('\n').split('=')
+        GroundT=float(tmp[1][:-2])
+      elif line.startswith('GroundU'):
+        tmp=line.rstrip('\n').split('=')
+        GroundU=int(float(tmp[1][:-1]))
+      elif line.startswith('Tropo'):
+        tmp=line.rstrip('\n').replace('='," ").split(" ")
+        TropoAlt=int(float(tmp[1][:-1]))
+      elif line.startswith('AltMax'):
+        tmp=line.rstrip('\n').split('=')
+        FinPTU=round(float(tmp[1][:-1]))
+      elif line.startswith('Pressure'):
+        tmp=line.rstrip('\n').split('=')
+        FinPTUP=round(float(tmp[1][:-3]),1)
+      elif line.startswith('SondeStart'):
+        tmp=line.rstrip('\n').split('=')
+        SondeStart=tmp[1][:-3]
+      elif line.startswith('Ascent'):
+        tmp=line.rstrip('\n').split('=')
+        tmp2=tmp[1][:-3]
+        Ascent=round(float(tmp2)/0.514444,1)
+
   return SondeStart, SondeID, GroundP, GroundClouds, GroundWindDir, GroundWindSpeed, GroundT, GroundU, TropoAlt, Ascent, FinPTU, FinPTUP
 
 def insertion(tableur, data):
@@ -199,11 +200,14 @@ if (__name__ == "__main__"):
     print("Le fichier "+tableur+" est ouvert. Il faut le fermer !")
   else:
    if len(sys.argv)>1 :
-     dateini = f"{datetime.datetime(sys.argv[1],sys.argv[1],sys.argv[1])}"
+     if int(float(sys.argv[1])) != 2024 :
+       print("L'année "+" est fausse")
+     else :
+       dateini = datetime.datetime(int(float(sys.argv[1])),int(float(sys.argv[2])),int(float(sys.argv[3])))
    else:
      dateini = datetime.datetime.now()
    aujourdhui= datetime.datetime.now()
-   date = dateini.strftime("%d-%m-%Y")
+   date =  dateini.strftime("%d-%m-%Y")
    if aujourdhui < dateini.replace(hour=2, minute=2):
      # Il est plus tôt que 2UTC ou 12h locale
      # Le RS du jour n'est pas encore arrivé 
@@ -213,7 +217,7 @@ if (__name__ == "__main__"):
      # Calcul des données => fichier REF
      SondeStart,SondeID,GroundP,GroundClouds,GroundWindDir,GroundWindSpeed,GroundT,GroundU,TropoAlt,Ascent,FinPTU,FinPTUP=lecture_rs_ref(date)
      # Calcul des données => fichier COR
-     Tmin,TTropo,FFVMax,DDVMax,AltVMax,DO=lecture_rs_cor(date,TropoAlt)
+     Tmin,TTropo,FFVMax,DDVMax,AltVMax,DO,PALtmax=lecture_rs_cor(date,TropoAlt)
      data = {}
      # Récupération des nouvelles données à insérer dans le tableur, sous forme de dictionnaire
      jour = int(date[0:2])
@@ -243,7 +247,7 @@ if (__name__ == "__main__"):
      data["DO"]       = DO
      data["VA"]       = Ascent
      data["FinPTU"]   = FinPTU
-     data["hPa"]      = FinPTUP
+     data["hPa"]      = PALtmax
      data["Rem"]      = 'RAS'
      print(data)
      # Insertion des nouvelles données dans le tableur
